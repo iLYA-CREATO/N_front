@@ -8,9 +8,7 @@
 
 // Импорт Axios для HTTP-запросов
 import axios from 'axios';
-
-// Базовый URL для API (проксируется через Vite)
-const API_URL = '/api';
+import { API_URL } from './config';
 
 // Создание экземпляра Axios с базовой конфигурацией
 const api = axios.create({

@@ -9,6 +9,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 // Импорты функций API для взаимодействия с сервером
 import { getBid, getBids, getClients, updateBid, getClientObjects, getComments, createComment, updateComment, deleteComment, getBidSpecifications, createBidSpecification, updateBidSpecification, deleteBidSpecification, getUsers, getSpecifications, getSpecificationCategories, getSpecificationCategoriesTree, getBidHistory, getBidStatuses, getBidStatusTransitions, getEquipment, getBidEquipment, createBidEquipment, updateBidEquipment, deleteBidEquipment, createBid, createBatchBids, getBidTypes, getClientEquipmentByClient, createClientEquipment, getRoles, getBidFiles, uploadBidFiles, deleteBidFile, getContractByBid, createContract, deleteContract } from '../services/api';
+import { UPLOADS_URL } from '../services/config';
 // Импорт функций для уведомлений
 import { createNotification } from '../services/api';
 // Импорт хука аутентификации
@@ -488,10 +489,9 @@ const BidDetail = () => {
     const fetchBidFiles = async () => {
         try {
             const response = await getBidFiles(id);
-            // Decode filename to avoid double-encoding issues
             const decodedFiles = response.data.map(file => ({
                 ...file,
-                path: `/uploads/bids/${id}/${decodeURIComponent(file.name)}`
+                path: `${UPLOADS_URL}/bids/${id}/${decodeURIComponent(file.name)}`
             }));
             setBidFiles(decodedFiles);
             

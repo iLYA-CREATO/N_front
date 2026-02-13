@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getEquipment, createEquipment, updateEquipment, deleteEquipment, getExpenseHistory, getReturnHistory, uploadEquipmentImages, deleteEquipmentImage } from '../services/api';
+import { UPLOADS_URL } from '../services/config';
 import { usePermissions } from '../hooks/usePermissions';
 import ConfirmModal from './ConfirmModal';
 
@@ -517,7 +518,7 @@ const Equipment = () => {
                                 onClick={() => openLightbox(index)}
                             >
                                 <img 
-                                    src={`/uploads/equipment/${selectedEquipment.id}/${filename}`}
+                                    src={`${UPLOADS_URL}/equipment/${selectedEquipment.id}/${filename}`}
                                     alt={`Изображение ${index + 1}`}
                                     className="w-full h-full object-cover rounded-lg"
                                 />
@@ -575,7 +576,7 @@ const Equipment = () => {
                     onClick={(e) => e.stopPropagation()}
                 >
                     <img 
-                        src={`/uploads/equipment/${selectedEquipment.id}/${uploadedImages[lightboxIndex]}`}
+                        src={`${UPLOADS_URL}/equipment/${selectedEquipment.id}/${uploadedImages[lightboxIndex]}`}
                         alt={`Изображение ${lightboxIndex + 1}`}
                         className="max-w-full max-h-[60vh] object-contain"
                         style={{ 
