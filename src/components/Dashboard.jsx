@@ -4,12 +4,13 @@
  * Основной компонент дашборда с боковой навигацией.
  * Отображает боковую панель с меню и основную область для дочерних компонентов.
  * Включает специальный режим для страницы настроек.
+ * Полная поддержка мобильных устройств.
  */
 
 // Импорт компонентов и хуков из React Router
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 // Импорт иконок из Lucide React
-import { User, Shield, Tag, Folder, FileText, Target, Settings, DoorOpen, ClipboardList, Users, Building, Package, DollarSign, LogOut, Cog, ChevronLeft, ChevronRight, Bell, BarChart2 } from 'lucide-react';
+import { User, Shield, Tag, Folder, FileText, Target, Settings, DoorOpen, ClipboardList, Users, Building, Package, DollarSign, LogOut, Cog, ChevronLeft, ChevronRight, Bell, BarChart2, Menu, X } from 'lucide-react';
 // Импорт хука состояния
 import { useState, useEffect, useMemo } from 'react';
 // Импорт хука аутентификации
@@ -34,8 +35,10 @@ const Dashboard = () => {
     const isSettings = location.pathname === '/dashboard/settings';
     // Состояние для активной вкладки в настройках
     const [activeSettingsTab, setActiveSettingsTab] = useState('user');
-    // Состояние для свернутой/развернутой боковой панели
+    // Состояние для свернутой/развернутой боковой панели (десктоп)
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+    // Состояние для показа мобильного меню
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     // Состояние для показа уведомлений
     const [showNotifications, setShowNotifications] = useState(false);
     const [notificationFilter, setNotificationFilter] = useState('all');
@@ -55,15 +58,31 @@ const Dashboard = () => {
         { id: 'administration', permission: 'settings_administration_button', label: 'Администрирование' },
     ];
 
+    // Определение основных навигационных элементов
+    const mainNavItems = [
+        { id: 'bids', path: '/dashboard/bids', label: 'Заявки', icon: ClipboardList, permission: null },
+        { id: 'clients', path: '/dashboard/clients', label: 'Клиенты', icon: Users, permission: null },
+        { id: 'contracts', path: '/dashboard/contracts', label: 'Договоры', icon: FileText, permission: null },
+        { id: 'objects', path: '/dashboard/objects', label: 'Объекты', icon: Building, permission: null },
+        { id: 'equipment', path: '/dashboard/equipment', label: 'Оборудование', icon: Package, permission: 'tab_warehouse' },
+        { id: 'salary', path: '/dashboard/salary', label: 'З/П', icon: DollarSign, permission: 'tab_salary' },
+        { id: 'analytics', path: '/dashboard/analytics', label: 'Аналитика', icon: BarChart2, permission: null },
+    ];
+
     // Установка активной вкладки на первую доступную при входе на страницу настроек
     useEffect(() => {
-        if (isSettings && activeSettingsTab === 'user') { // Только если мы еще не переключались
+        if (isSettings && activeSettingsTab === 'user') {
             const firstAvailableTab = availableSettingsTabs.find(tab => hasPermission(tab.permission));
             if (firstAvailableTab && firstAvailableTab.id !== 'user') {
                 setActiveSettingsTab(firstAvailableTab.id);
             }
         }
     }, [isSettings, activeSettingsTab]);
+
+    // Закрытие мобильного меню при изменении маршрута
+    useEffect(() => {
+        setIsMobileMenuOpen(false);
+    }, [location.pathname]);
 
     // Закрытие панели уведомлений при клике вне её
     useEffect(() => {
@@ -92,11 +111,6 @@ const Dashboard = () => {
         }
     };
 
-    // Загрузка уведомлений при изменении фильтра
-    useEffect(() => {
-        fetchNotifications();
-    }, [notificationFilter]);
-
     // Функция для получения иконки для вкладки настроек
     const getSettingsIcon = useMemo(() => (tabId) => {
         const icons = {
@@ -111,36 +125,201 @@ const Dashboard = () => {
         return icons[tabId] || <Settings key="default-settings-icon" size={20} />;
     }, []);
 
-    // Функция для получения иконки для основной навигации
-    const getNavIcon = useMemo(() => (navId) => {
-        const icons = {
-            'bids': <ClipboardList key="bids-icon" size={20} />,
-            'clients': <Users key="clients-icon" size={20} />,
-            'contracts': <FileText key="contracts-icon" size={20} />,
-            'objects': <Building key="objects-icon" size={20} />,
-            'equipment': <Package key="equipment-icon" size={20} />,
-            'salary': <DollarSign key="salary-icon" size={20} />,
-            'analytics': <BarChart2 key="analytics-icon" size={20} />,
-            'settings': <Cog key="settings-icon" size={20} />,
-            'logout': <LogOut key="logout-icon" size={20} />
-        };
-        return icons[navId] || <Cog key="default-nav-icon" size={20} />;
-    }, []);
+    // Функция для закрытия мобильного меню
+    const closeMobileMenu = () => {
+        setIsMobileMenuOpen(false);
+    };
+
+    // Вычисление отступа для десктопа
+    const desktopMainMargin = isSettings 
+        ? (isSidebarCollapsed ? 'ml-16' : 'ml-56')
+        : (isSidebarCollapsed ? 'ml-16' : 'ml-64');
 
     return (
         <div className="min-h-screen bg-gray-100">
-            {/* Верхняя панель с кнопкой выхода */}
-            <div className="fixed top-0 bg-sky-50 flex justify-end items-center h-16 px-4 gap-4 z-10" style={{ left: `${isSettings ? (isSidebarCollapsed ? 4 : 14) : isSidebarCollapsed ? 4 : 16}rem`, width: `calc(100% - ${isSettings ? (isSidebarCollapsed ? 4 : 14) : isSidebarCollapsed ? 4 : 16}rem)`, transition: 'left 0.3s, width 0.3s' }}>
+            {/* Мобильная шапка */}
+            <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-200 z-20 flex items-center justify-between px-4">
+                <button
+                    onClick={() => setIsMobileMenuOpen(true)}
+                    className="p-2 rounded-lg hover:bg-gray-100 mobile-tap"
+                >
+                    <Menu size={24} />
+                </button>
+                <span className="font-semibold text-gray-800">CRM System</span>
+                <button
+                    onClick={() => setShowNotifications(!showNotifications)}
+                    className={`relative p-2 rounded-lg mobile-tap ${unreadCount > 0 ? 'text-orange-500' : 'text-gray-600'}`}
+                >
+                    <Bell size={24} />
+                    {unreadCount > 0 && (
+                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                            {unreadCount}
+                        </span>
+                    )}
+                </button>
+            </div>
+
+            {/* Мобильное меню (sidebar overlay) */}
+            <div className={`mobile-sidebar-overlay ${isMobileMenuOpen ? 'active' : ''}`} onClick={closeMobileMenu} />
+            <aside className={`mobile-sidebar ${isMobileMenuOpen ? 'active' : ''}`}>
+                <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+                    <span className="font-semibold text-gray-800">Меню</span>
+                    <button onClick={closeMobileMenu} className="p-2 rounded-lg hover:bg-gray-100 mobile-tap">
+                        <X size={24} />
+                    </button>
+                </div>
+                <nav className="p-4">
+                    <div className="space-y-2">
+                        {/* Навигация по основным разделам */}
+                        {mainNavItems.map(item => {
+                            const Icon = item.icon;
+                            if (item.permission && !canAccessTab(item.permission.replace('tab_', ''))) return null;
+                            return (
+                                <NavLink
+                                    key={item.id}
+                                    to={item.path}
+                                    className={({ isActive }) =>
+                                        `flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition ${
+                                            isActive
+                                                ? 'bg-blue-100 text-blue-700'
+                                                : 'text-gray-600 hover:bg-gray-100'
+                                        }`
+                                    }
+                                    onClick={closeMobileMenu}
+                                >
+                                    <Icon size={20} />
+                                    <span>{item.label}</span>
+                                </NavLink>
+                            );
+                        })}
+                        <div className="border-t border-gray-200 my-4"></div>
+                        {/* Настройки в мобильном меню */}
+                        <NavLink
+                            to="/dashboard/settings"
+                            className={({ isActive }) =>
+                                `flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition ${
+                                    isActive
+                                        ? 'bg-blue-100 text-blue-700'
+                                        : 'text-gray-600 hover:bg-gray-100'
+                                }`
+                            }
+                            onClick={closeMobileMenu}
+                        >
+                            <Cog size={20} />
+                            <span>Настройки</span>
+                        </NavLink>
+                        {/* Выход в мобильном меню */}
+                        <button
+                            onClick={logout}
+                            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition text-red-600 hover:bg-red-50"
+                        >
+                            <LogOut size={20} />
+                            <span>Выйти</span>
+                        </button>
+                    </div>
+                </nav>
+            </aside>
+
+            {/* Десктопная боковая панель */}
+            <aside className="desktop-sidebar hidden md:flex flex-col fixed left-0 top-0 h-screen bg-sky-50 transition-all duration-300 z-10"
+                style={{ width: isSettings ? (isSidebarCollapsed ? '4rem' : '14rem') : (isSidebarCollapsed ? '4rem' : '16rem') }}
+            >
+                {/* Условный рендеринг: если на странице настроек */}
+                {isSettings ? (
+                    <div className="p-4">
+                        <button
+                            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                            className={`mb-4 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg transition font-medium ${isSidebarCollapsed ? 'flex justify-center items-center w-full p-2' : 'px-4 py-2 w-full'}`}
+                            title={isSidebarCollapsed ? "Развернуть панель" : "Свернуть панель"}
+                        >
+                            {isSidebarCollapsed ? '→' : '← Свернуть'}
+                        </button>
+                        <button
+                            onClick={() => window.history.back()}
+                            className={`mb-4 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg transition font-medium ${isSidebarCollapsed ? 'flex justify-center items-center w-full p-2' : 'px-4 py-2 w-full'}`}
+                            title="Вернуться"
+                        >
+                            {isSidebarCollapsed ? <DoorOpen size={20} /> : 'Вернуться'}
+                        </button>
+                        <nav className="space-y-2">
+                            {availableSettingsTabs
+                                .filter(tab => hasPermission(tab.permission) || user?.role === 'Админ')
+                                .map(tab => (
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => setActiveSettingsTab(tab.id)}
+                                        className={`${isSidebarCollapsed ? 'flex justify-center px-2 py-2' : 'w-full text-left px-4 py-2'} rounded-lg font-medium transition ${
+                                            activeSettingsTab === tab.id
+                                                ? 'bg-blue-100 text-blue-700 border-r-4 border-blue-500'
+                                                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                                        }`}
+                                        title={isSidebarCollapsed ? tab.label : ""}
+                                    >
+                                        {isSidebarCollapsed ? getSettingsIcon(tab.id) : tab.label}
+                                    </button>
+                                ))}
+                        </nav>
+                    </div>
+                ) : (
+                    <>
+                        <div className={`p-4 border-b border-gray-200 ${isSidebarCollapsed ? 'flex justify-center' : ''}`}>
+                            <button
+                                onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                                className={`${isSidebarCollapsed ? 'flex justify-center text-gray-600 hover:text-gray-900 hover:bg-gray-100 p-2 rounded transition-all' : 'flex items-center px-4 py-2 gap-2 rounded-lg font-medium transition text-gray-600 hover:bg-gray-100 hover:text-gray-900'}`}
+                                title={isSidebarCollapsed ? "Развернуть" : "Свернуть"}
+                            >
+                                {isSidebarCollapsed ? <ChevronRight size={20} /> : <><ChevronLeft size={20} /> <span>Свернуть</span></>}
+                            </button>
+                        </div>
+                        <nav className="flex-1 p-4">
+                            <div className="space-y-2">
+                                {mainNavItems.map(item => {
+                                    const Icon = item.icon;
+                                    if (item.permission && !canAccessTab(item.permission.replace('tab_', ''))) return null;
+                                    return (
+                                        <NavLink
+                                            key={item.id}
+                                            to={item.path}
+                                            className={({ isActive }) =>
+                                                `${isActive ? 'bg-blue-100 text-blue-700 border-r-4 border-blue-500' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'} ${isSidebarCollapsed ? 'flex justify-center p-2' : 'flex items-center px-4 py-2 gap-2'} rounded-lg font-medium transition`
+                                            }
+                                            title={isSidebarCollapsed ? item.label : ""}
+                                        >
+                                            <Icon size={20} />
+                                            {!isSidebarCollapsed && <span>{item.label}</span>}
+                                        </NavLink>
+                                    );
+                                })}
+                            </div>
+                        </nav>
+                        <div className="p-4 border-t border-gray-200">
+                            <NavLink
+                                to="/dashboard/settings"
+                                className={({ isActive }) =>
+                                    `${isActive ? 'bg-blue-100 text-blue-700 border-r-4 border-blue-500' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'} ${isSidebarCollapsed ? 'flex justify-center p-2' : 'flex items-center px-4 py-2 gap-2'} rounded-lg font-medium transition`
+                                }
+                                title={isSidebarCollapsed ? "Настройки" : ""}
+                            >
+                                <Cog size={20} />
+                                {!isSidebarCollapsed && <span>Настройки</span>}
+                            </NavLink>
+                        </div>
+                    </>
+                )}
+            </aside>
+
+            {/* Десктопная верхняя панель */}
+            <div className="hidden md:flex fixed top-0 bg-sky-50 justify-end items-center h-16 px-4 gap-4 z-10"
+                style={{ left: isSettings ? (isSidebarCollapsed ? '4rem' : '14rem') : (isSidebarCollapsed ? '4rem' : '16rem'), width: `calc(100% - ${isSettings ? (isSidebarCollapsed ? '4rem' : '14rem') : (isSidebarCollapsed ? '4rem' : '16rem')})` }}
+            >
                 <div className="flex items-center gap-2 text-gray-700 font-medium mr-4">
                     <User size={20} />
-                    {user?.fullName}
+                    <span className="hidden lg:inline">{user?.fullName}</span>
                 </div>
                 <button
                     onClick={() => {
                         setShowNotifications(!showNotifications);
-                        if (!showNotifications) {
-                            fetchNotifications();
-                        }
+                        if (!showNotifications) fetchNotifications();
                     }}
                     className={`notification_button relative flex items-center justify-center w-10 h-10 rounded-lg transition ${
                         unreadCount > 0 
@@ -156,7 +335,6 @@ const Dashboard = () => {
                         </span>
                     )}
                 </button>
-                {/* Панель уведомлений */}
                 {showNotifications && (
                     <div className="notification_panel absolute top-16 right-4 w-80 bg-white border border-gray-300 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
                         <div className="p-4 border-b border-gray-200">
@@ -177,29 +355,17 @@ const Dashboard = () => {
                         </div>
                         <div className="divide-y divide-gray-100">
                             {loadingNotifications ? (
-                                <div className="p-8 text-center text-gray-500">
-                                    Загрузка...
-                                </div>
+                                <div className="p-8 text-center text-gray-500">Загрузка...</div>
                             ) : notifications.length > 0 ? (
                                 notifications.map(notification => (
                                     <div
                                         key={notification.id}
-                                        className={`p-4 hover:bg-gray-50 cursor-pointer transition ${
-                                            !notification.isRead ? 'bg-blue-50' : ''
-                                        }`}
+                                        className={`p-4 hover:bg-gray-50 cursor-pointer transition ${!notification.isRead ? 'bg-blue-50' : ''}`}
                                         onClick={async () => {
                                             if (!notification.isRead) {
-                                                try {
-                                                    await markNotificationAsRead(notification.id);
-                                                    setNotifications(prev =>
-                                                        prev.map(n =>
-                                                            n.id === notification.id ? { ...n, isRead: true } : n
-                                                        )
-                                                    );
-                                                    setUnreadCount(prev => Math.max(0, prev - 1));
-                                                } catch (error) {
-                                                    console.error('Ошибка при отметке уведомления:', error);
-                                                }
+                                                await markNotificationAsRead(notification.id);
+                                                setNotifications(prev => prev.map(n => n.id === notification.id ? { ...n, isRead: true } : n));
+                                                setUnreadCount(prev => Math.max(0, prev - 1));
                                             }
                                         }}
                                     >
@@ -212,226 +378,72 @@ const Dashboard = () => {
                                                 'bg-gray-500'
                                             }`}></div>
                                             <div className="flex-1">
-                                                <p className={`font-medium text-sm ${
-                                                    !notification.isRead ? 'text-gray-900' : 'text-gray-600'
-                                                }`}>
+                                                <p className={`font-medium text-sm ${!notification.isRead ? 'text-gray-900' : 'text-gray-600'}`}>
                                                     {notification.title}
                                                 </p>
-                                                <p className="text-xs text-gray-500 mt-1">
-                                                    {notification.message}
-                                                </p>
+                                                <p className="text-xs text-gray-500 mt-1">{notification.message}</p>
                                                 <p className="text-xs text-gray-400 mt-2">
                                                     {new Date(notification.createdAt).toLocaleString()}
                                                 </p>
                                             </div>
-                                            {!notification.isRead && (
-                                                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                                            )}
                                         </div>
                                     </div>
                                 ))
                             ) : (
-                                <div className="p-8 text-center text-gray-500">
-                                    Нет уведомлений
-                                </div>
+                                <div className="p-8 text-center text-gray-500">Нет уведомлений</div>
                             )}
                         </div>
                     </div>
                 )}
                 <button
                     onClick={logout}
-                    className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg transition"
+                    className="hidden lg:flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg transition"
                 >
                     <LogOut size={20} /> Выйти
                 </button>
             </div>
-            {/* Боковая панель: ширина зависит от состояния свернутости и страницы настроек */}
-            <aside className={`${isSettings ? `${isSidebarCollapsed ? 'w-16' : 'w-56'} px-4 py-6 bg-sky-50 fixed left-0 top-0 h-screen transition-all duration-300` : `${isSidebarCollapsed ? 'w-16' : 'w-64'} bg-sky-50 flex flex-col fixed left-0 top-0 h-screen transition-all duration-300`}`}>
-                {/* Условный рендеринг: если на странице настроек */}
-                {isSettings ? (
-                    <div>
-                        {/* Кнопка сворачивания/разворачивания боковой панели */}
-                        <button
-                            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                            className={`mb-4 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg transition font-medium ${isSidebarCollapsed ? 'flex justify-center items-center w-full p-2 text-lg' : 'px-4 py-2 w-full'}`}
-                            title={isSidebarCollapsed ? "Развернуть панель" : "Свернуть панель"}
-                        >
-                            {isSidebarCollapsed ? '→' : '← Свернуть панель'}
-                        </button>
-                        {/* Кнопка возврата на предыдущую страницу */}
-                        <button
-                            onClick={() => window.history.back()}
-                            className={`mb-4 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg transition font-medium ${isSidebarCollapsed ? 'flex justify-center items-center w-full p-2' : 'px-4 py-2 w-full'}`}
-                            title="Вернуться"
-                        >
-                            {isSidebarCollapsed ? <DoorOpen size={20} /> : 'Вернуться'}
-                        </button>
-                        {/* Навигация по вкладкам настроек */}
-                        <nav className="space-y-2">
-                            {availableSettingsTabs
-                                .filter(tab => hasPermission(tab.permission) || user?.role === 'Админ')
-                                .map(tab => (
-                                    <button
-                                        key={tab.id}
-                                        onClick={() => setActiveSettingsTab(tab.id)}
-                                        className={`${isSidebarCollapsed ? 'flex justify-center px-2 py-2' : 'w-full text-left px-4 py-2'} rounded-lg font-medium transition ${
-                                            activeSettingsTab === tab.id
-                                                ? 'bg-blue-100 text-blue-700 border-r-4 border-blue-500' // Активная вкладка
-                                                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' // Неактивная
-                                        }`}
-                                        title={isSidebarCollapsed ? tab.label : ""}
-                                    >
-                                        {isSidebarCollapsed ? getSettingsIcon(tab.id) : tab.label}
-                                    </button>
-                                ))}
-                        </nav>
-                    </div>
-                ) : (
-                    <>
-                        {/* Логотип в верхней части боковой панели */}
-                        <div className={`p-6 border-b border-gray-200 ${isSidebarCollapsed && !isSettings ? 'flex justify-center' : ''}`}>
-                            {!isSettings && (
-                                <button
-                                    onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                                    className={`${isSidebarCollapsed ? 'flex justify-center text-gray-600 hover:text-gray-900 hover:bg-gray-100 p-2 rounded transition-all' : 'flex items-center px-4 py-2 gap-2 rounded-lg font-medium transition text-gray-600 hover:bg-gray-100 hover:text-gray-900'}`}
-                                    title={isSidebarCollapsed ? "Развернуть" : "Свернуть"}
-                                >
-                                    {isSidebarCollapsed ? <ChevronRight size={20} /> : <><ChevronLeft size={20} /> <span className={`transition-opacity duration-300 ${isSidebarCollapsed ? 'opacity-0 hidden' : 'opacity-100'}`}>Свернуть</span></>}
-                                </button>
-                            )}
-                        </div>
 
-                        {/* Основная навигация */}
-                        <nav className="flex-1 px-4 py-6">
-                            <div className="space-y-2">
-                                {/* Ссылка на страницу заявок */}
-                                <NavLink
-                                    to="/dashboard/bids"
-                                    className={({ isActive }) =>
-                                        `${
-                                            isActive
-                                                ? 'bg-blue-100 text-blue-700 border-r-4 border-blue-500' // Активная ссылка
-                                                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' // Неактивная
-                                        } ${isSidebarCollapsed ? 'flex justify-center p-2' : 'flex items-center px-4 py-2 gap-2'} rounded-lg font-medium transition`
-                                    }
-                                    title={isSidebarCollapsed ? "Заявки" : ""}
-                                >
-                                    {getNavIcon('bids')} <span className={`transition-opacity duration-300 ${isSidebarCollapsed ? 'opacity-0 hidden' : 'opacity-100'}`}>Заявки</span>
-                                </NavLink>
-                                {/* Ссылка на страницу клиентов */}
-                                <NavLink
-                                    to="/dashboard/clients"
-                                    className={({ isActive }) =>
-                                        `${
-                                            isActive
-                                                ? 'bg-blue-100 text-blue-700 border-r-4 border-blue-500'
-                                                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                                        } ${isSidebarCollapsed ? 'flex justify-center p-2' : 'flex items-center px-4 py-2 gap-2'} rounded-lg font-medium transition`
-                                    }
-                                    title={isSidebarCollapsed ? "Клиенты" : ""}
-                                >
-                                    {getNavIcon('clients')} <span className={`transition-opacity duration-300 ${isSidebarCollapsed ? 'opacity-0 hidden' : 'opacity-100'}`}>Клиенты</span>
-                                </NavLink>
-                                {/* Ссылка на страницу договоров */}
-                                <NavLink
-                                    to="/dashboard/contracts"
-                                    className={({ isActive }) =>
-                                        `${
-                                            isActive
-                                                ? 'bg-blue-100 text-blue-700 border-r-4 border-blue-500'
-                                                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                                        } ${isSidebarCollapsed ? 'flex justify-center p-2' : 'flex items-center px-4 py-2 gap-2'} rounded-lg font-medium transition`
-                                    }
-                                    title={isSidebarCollapsed ? "Договоры" : ""}
-                                >
-                                    {getNavIcon('contracts')} <span className={`transition-opacity duration-300 ${isSidebarCollapsed ? 'opacity-0 hidden' : 'opacity-100'}`}>Договоры</span>
-                                </NavLink>
-                                {/* Ссылка на страницу объектов */}
-                                <NavLink
-                                    to="/dashboard/objects"
-                                    className={({ isActive }) =>
-                                        `${
-                                            isActive
-                                                ? 'bg-blue-100 text-blue-700 border-r-4 border-blue-500'
-                                                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                                        } ${isSidebarCollapsed ? 'flex justify-center p-2' : 'flex items-center px-4 py-2 gap-2'} rounded-lg font-medium transition`
-                                    }
-                                    title={isSidebarCollapsed ? "Объекты" : ""}
-                                >
-                                    {getNavIcon('objects')} <span className={`transition-opacity duration-300 ${isSidebarCollapsed ? 'opacity-0 hidden' : 'opacity-100'}`}>Объекты</span>
-                                </NavLink>
-                                {/* Ссылка на страницу оборудования */}
-                                {canAccessTab('warehouse') && (
-                                    <NavLink
-                                        to="/dashboard/equipment"
-                                        className={({ isActive }) =>
-                                            `${
-                                                isActive
-                                                    ? 'bg-blue-100 text-blue-700 border-r-4 border-blue-500'
-                                                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                                            } ${isSidebarCollapsed ? 'flex justify-center p-2' : 'flex items-center px-4 py-2 gap-2'} rounded-lg font-medium transition`
-                                        }
-                                        title={isSidebarCollapsed ? "Оборудование" : ""}
-                                    >
-                                        {getNavIcon('equipment')} <span className={`transition-opacity duration-300 ${isSidebarCollapsed ? 'opacity-0 hidden' : 'opacity-100'}`}>Оборудование</span>
-                                    </NavLink>
-                                )}
-                                {/* Ссылка на страницу зарплаты */}
-                                {canAccessTab('salary') && (
-                                    <NavLink
-                                        to="/dashboard/salary"
-                                        className={({ isActive }) =>
-                                            `${
-                                                isActive
-                                                    ? 'bg-blue-100 text-blue-700 border-r-4 border-blue-500'
-                                                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                                            } ${isSidebarCollapsed ? 'flex justify-center p-2' : 'flex items-center px-4 py-2 gap-2'} rounded-lg font-medium transition`
-                                        }
-                                        title={isSidebarCollapsed ? "Зарплата" : ""}
-                                    >
-                                        {getNavIcon('salary')} <span className={`transition-opacity duration-300 ${isSidebarCollapsed ? 'opacity-0 hidden' : 'opacity-100'}`}>З/П</span>
-                                    </NavLink>
-                                )}
-                                {/* Ссылка на страницу аналитики */}
-                                <NavLink
-                                    to="/dashboard/analytics"
-                                    className={({ isActive }) =>
-                                        `${
-                                            isActive
-                                                ? 'bg-blue-100 text-blue-700 border-r-4 border-blue-500'
-                                                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                                        } ${isSidebarCollapsed ? 'flex justify-center p-2' : 'flex items-center px-4 py-2 gap-2'} rounded-lg font-medium transition`
-                                    }
-                                    title={isSidebarCollapsed ? "Аналитика" : ""}
-                                >
-                                    {getNavIcon('analytics')} <span className={`transition-opacity duration-300 ${isSidebarCollapsed ? 'opacity-0 hidden' : 'opacity-100'}`}>Аналитика</span>
-                                </NavLink>
-                            </div>
-                        </nav>
-
-                        {/* Нижняя часть боковой панели с настройками */}
-                        <div className="p-4 border-t border-gray-200">
-                            <NavLink
-                                to="/dashboard/settings"
-                                className={({ isActive }) =>
-                                    `${isActive ? 'bg-blue-100 text-blue-700 border-r-4 border-blue-500' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'} ${isSidebarCollapsed ? 'flex justify-center p-2' : 'flex items-center px-4 py-2 gap-2'} rounded-lg font-medium transition`
-                                }
-                                title={isSidebarCollapsed ? "Настройки" : ""}
-                            >
-                                {getNavIcon('settings')} <span className={`transition-opacity duration-300 ${isSidebarCollapsed ? 'opacity-0 hidden' : 'opacity-100'}`}>Настройки</span>
-                            </NavLink>
-                        </div>
-
-                    </>
-                )}
-            </aside>
-
-            {/* Основная область для отображения дочерних компонентов */}
-            <main className={`mt-16 h-[calc(100vh-4rem)] ${isSettings ? (isSidebarCollapsed ? 'ml-16' : 'ml-48') : isSidebarCollapsed ? 'ml-16' : 'ml-64'} transition-all duration-300`}>
-                <div className="p-8 h-full overflow-auto">
-                    <Outlet key={activeSettingsTab} context={{ activeSettingsTab }} /> {/* Передача контекста дочерним маршрутам */}
+            {/* Основная область */}
+            <main className={`pt-16 md:pt-16 h-[calc(100vh-4rem)] md:h-[calc(100vh-4rem)] ${desktopMainMargin} transition-all duration-300`}>
+                <div className="p-4 md:p-8 h-full overflow-auto">
+                    <Outlet key={activeSettingsTab} context={{ activeSettingsTab }} />
                 </div>
             </main>
+
+            {/* Мобильная нижняя панель навигации */}
+            <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-30 pb-safe">
+                <div className="flex justify-around items-center py-2">
+                    {mainNavItems.slice(0, 5).map(item => {
+                        const Icon = item.icon;
+                        if (item.permission && !canAccessTab(item.permission.replace('tab_', ''))) return null;
+                        return (
+                            <NavLink
+                                key={item.id}
+                                to={item.path}
+                                className={({ isActive }) =>
+                                    `flex flex-col items-center px-3 py-2 rounded-lg transition ${
+                                        isActive ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'
+                                    }`
+                                }
+                            >
+                                <Icon size={24} />
+                                <span className="text-xs mt-1">{item.label}</span>
+                            </NavLink>
+                        );
+                    })}
+                    <NavLink
+                        to="/dashboard/settings"
+                        className={({ isActive }) =>
+                            `flex flex-col items-center px-3 py-2 rounded-lg transition ${
+                                isActive ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'
+                            }`
+                        }
+                    >
+                        <Settings size={24} />
+                        <span className="text-xs mt-1">Настройки</span>
+                    </NavLink>
+                </div>
+            </nav>
         </div>
     );
 };

@@ -820,23 +820,22 @@ const Bids = () => {
         <div className="relative">
             {/* Модальное окно создания новой заявки */}
             {showForm && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[95vh] overflow-y-auto">
-                        <div className="p-6">
-                            <div className="flex justify-between items-center mb-4">
-                                <h3 className="text-xl font-bold">{isBatchMode ? 'Тиражирование заявок' : 'Добавить новую заявку'}</h3>
-                                <button
-                                    onClick={() => {
-                                        if (showForm) {
-                                            resetForm(); // Сброс формы перед закрытием
-                                        }
-                                        setShowForm(!showForm);
-                                    }}
-                                    className="text-gray-500 hover:text-gray-700"
-                                >
-                                    <X size={24} />
-                                </button>
-                            </div>
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end md:items-center justify-center z-50 p-0 md:p-4">
+                    <div className="bg-white rounded-t-2xl md:rounded-lg shadow-xl w-full md:max-w-6xl max-h-[90vh] md:max-h-[85vh] overflow-y-auto animate-slide-up md:animate-none">
+                        <div className="sticky top-0 bg-white p-4 md:p-6 border-b flex justify-between items-center z-10">
+                            <h3 className="text-lg md:text-xl font-bold">{isBatchMode ? 'Тиражирование заявок' : 'Добавить новую заявку'}</h3>
+                            <button
+                                onClick={() => {
+                                    if (showForm) {
+                                        resetForm();
+                                    }
+                                    setShowForm(!showForm);
+                                }}
+                                className="text-gray-500 hover:text-gray-700 p-2"
+                            >
+                                <X size={24} />
+                            </button>
+                        </div>
                             <form onSubmit={handleSubmit}>
                                 {/* Batch Mode Checkbox */}
                                 <div className="mb-4">
@@ -1147,17 +1146,17 @@ const Bids = () => {
 
             {/* Модальное окно быстрого создания клиента */}
             {showClientModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
-                        <div className="p-6">
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end md:items-center justify-center z-50 p-0 md:p-4">
+                    <div className="bg-white rounded-t-2xl md:rounded-lg shadow-xl w-full md:max-w-md animate-slide-up md:animate-none">
+                        <div className="p-4 md:p-6">
                             <div className="flex justify-between items-center mb-4">
-                                <h3 className="text-xl font-bold">Создать клиента</h3>
+                                <h3 className="text-lg md:text-xl font-bold">Создать клиента</h3>
                                 <button
                                     onClick={() => {
                                         setShowClientModal(false);
                                         setQuickClientForm({ name: '', email: '', phone: '' });
                                     }}
-                                    className="text-gray-500 hover:text-gray-700"
+                                    className="text-gray-500 hover:text-gray-700 p-2"
                                 >
                                     <X size={24} />
                                 </button>
@@ -1222,17 +1221,17 @@ const Bids = () => {
 
             {/* Модальное окно быстрого создания объекта */}
             {showObjectModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
-                        <div className="p-6">
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end md:items-center justify-center z-50 p-0 md:p-4">
+                    <div className="bg-white rounded-t-2xl md:rounded-lg shadow-xl w-full md:max-w-md animate-slide-up md:animate-none">
+                        <div className="p-4 md:p-6">
                             <div className="flex justify-between items-center mb-4">
-                                <h3 className="text-xl font-bold">Создать объект</h3>
+                                <h3 className="text-lg md:text-xl font-bold">Создать объект</h3>
                                 <button
                                     onClick={() => {
                                         setShowObjectModal(false);
                                         setQuickObjectForm({ brandModel: '', stateNumber: '' });
                                     }}
-                                    className="text-gray-500 hover:text-gray-700"
+                                    className="text-gray-500 hover:text-gray-700 p-2"
                                 >
                                     <X size={24} />
                                 </button>
@@ -1718,18 +1717,18 @@ const Bids = () => {
 
             {/* Filter Modal */}
             {showFilterModal && (
-                <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-xl shadow-2xl p-6 w-[500px] max-w-full max-h-[80vh] overflow-y-auto">
-                        <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-xl font-semibold text-gray-800">Настройки фильтров</h3>
+                <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-end md:items-center justify-center z-50 p-0 md:p-4">
+                    <div className="bg-white rounded-t-2xl md:rounded-xl shadow-2xl w-full md:w-[500px] max-w-full max-h-[80vh] overflow-y-auto animate-slide-up md:animate-none">
+                        <div className="sticky top-0 bg-white p-4 md:p-6 border-b flex items-center justify-between z-10">
+                            <h3 className="text-lg md:text-xl font-semibold text-gray-800">Настройки фильтров</h3>
                             <button
                                 onClick={() => setShowFilterModal(false)}
-                                className="p-2 hover:bg-gray-100 rounded-full transition"
+                                className="p-2 hover:bg-gray-100 rounded-full transition md:hidden"
                             >
                                 <X size={20} className="text-gray-500" />
                             </button>
                         </div>
-                        <div className="space-y-4">
+                        <div className="p-4 md:p-6 space-y-4">
                             <label className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer transition">
                                 <input
                                     type="checkbox"
