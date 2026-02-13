@@ -438,10 +438,13 @@ const BidDetail = () => {
         try {
             // Use the existing getBids API but filter by parentId
             const response = await getBids();
-            const childBids = response.data.filter(b => b.parentId === parseInt(id));
+            // Ensure response.data is an array before filtering
+            const bidsData = Array.isArray(response.data) ? response.data : [];
+            const childBids = bidsData.filter(b => b.parentId === parseInt(id));
             setChildBids(childBids);
         } catch (error) {
             console.error('Error fetching child bids:', error);
+            setChildBids([]);
         }
     };
 
