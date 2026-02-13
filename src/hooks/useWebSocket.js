@@ -11,8 +11,20 @@ export function useWebSocket(onNewBid) {
 
     const connect = useCallback(() => {
         // Получаем URL WebSocket сервера
-        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsHost = import.meta.env.VITE_WS_URL || `${wsProtocol}//${window.location.host}`;
+        // Используем VITE_WS_URL если задан, иначе вычисляем из VITE_API_URL или window.location
+        let wsUrl;
+        
+        if (import.meta.env.VITE_WS_URL) {
+            wsUrl = import.meta.env.VITE_WS_URL;
+        } else if (import.meta.env.VITE_API_URL) {
+            // Преобразуем API URL в WebSocket URL
+            const apiUrl = import.meta.env.VITE_API_URL;
+            wsUrl = apiUrl.replace(/^https:/, 'wss:').replace(/^http:/, 'ws:');
+        } else {
+            // Используем текущий хост как fallback
+            const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            wsUrl = `${wsProtocol}//${window.location.host}`;
+        }
         
         // Закрываем существующее соединение, если оно есть
         if (wsRef.current) {
@@ -20,7 +32,7 @@ export function useWebSocket(onNewBid) {
         }
 
         try {
-            wsRef.current = new WebSocket(wsHost);
+            wsRef.current = new WebSocket(wsUrl);
 
             wsRef.current.onopen = () => {
                 console.log('🔌 WebSocket подключен');
