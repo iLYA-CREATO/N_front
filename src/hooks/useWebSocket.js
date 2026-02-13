@@ -1,34 +1,40 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
 /**
- * WebSocket хук для подключения к серверу и получения уведомлений
+ * WebSocket хук с fallback на polling
  */
 export function useWebSocket(onNewBid) {
     const [isConnected, setIsConnected] = useState(false);
     const [lastBid, setLastBid] = useState(null);
+    const [usePolling, setUsePolling] = useState(false);
     const wsRef = useRef(null);
     const reconnectTimeoutRef = useRef(null);
+    const pollingIntervalRef = useRef(null);
+    const reconnectAttemptsRef = useRef(0);
+    const maxReconnectAttempts = 3;
 
     const connect = useCallback(() => {
         // Получаем URL WebSocket сервера
-        // Используем VITE_WS_URL если задан, иначе вычисляем из VITE_API_URL или window.location
         let wsUrl;
         
         if (import.meta.env.VITE_WS_URL) {
             wsUrl = import.meta.env.VITE_WS_URL;
         } else if (import.meta.env.VITE_API_URL) {
-            // Преобразуем API URL в WebSocket URL
             const apiUrl = import.meta.env.VITE_API_URL;
             wsUrl = apiUrl.replace(/^https:/, 'wss:').replace(/^http:/, 'ws:');
         } else {
-            // Используем текущий хост как fallback
             const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             wsUrl = `${wsProtocol}//${window.location.host}`;
         }
         
-        // Закрываем существующее соединение, если оно есть
+        // Закрываем существующее соединение
         if (wsRef.current) {
             wsRef.current.close();
+        }
+
+        // Если уже переключились на polling, не пытаемся переподключиться
+        if (usePolling) {
+            return;
         }
 
         try {
@@ -37,15 +43,25 @@ export function useWebSocket(onNewBid) {
             wsRef.current.onopen = () => {
                 console.log('🔌 WebSocket подключен');
                 setIsConnected(true);
+                reconnectAttemptsRef.current = 0;
             };
 
             wsRef.current.onclose = () => {
                 console.log('🔌 WebSocket отключен');
                 setIsConnected(false);
                 
+                reconnectAttemptsRef.current++;
+                
+                // Если превышено количество попыток, переключаемся на polling
+                if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
+                    console.log('📡 Переключение на polling режим');
+                    setUsePolling(true);
+                    return;
+                }
+                
                 // Попытка переподключения через 3 секунды
                 reconnectTimeoutRef.current = setTimeout(() => {
-                    console.log('🔄 Попытка переподключения WebSocket...');
+                    console.log(`🔄 Попытка переподключения WebSocket (${reconnectAttemptsRef.current}/${maxReconnectAttempts})...`);
                     connect();
                 }, 3000);
             };
@@ -73,12 +89,72 @@ export function useWebSocket(onNewBid) {
             console.error('Ошибка создания WebSocket соединения:', error);
             setIsConnected(false);
         }
+    }, [onNewBid, usePolling]);
+
+    // Polling fallback - проверяем новые заявки каждые 10 секунд
+    const startPolling = useCallback(async () => {
+        if (pollingIntervalRef.current) {
+            return;
+        }
+        
+        const pollForNewBids = async () => {
+            try {
+                const apiUrl = import.meta.env.VITE_API_URL || `${window.location.protocol}//${window.location.host}/api`;
+                const response = await fetch(`${apiUrl}/bids?sortBy=createdAt&sortOrder=desc&limit=1`);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.data && data.data.length > 0) {
+                        const latestBid = data.data[0];
+                        // Проверяем,是新 заявка (создана менее 30 секунд назад)
+                        const bidTime = new Date(latestBid.createdAt);
+                        const now = new Date();
+                        const diffSeconds = (now - bidTime) / 1000;
+                        
+                        if (diffSeconds < 30) {
+                            console.log('📩 Polling: обнаружена новая заявка:', latestBid);
+                            setLastBid({
+                                id: latestBid.id,
+                                tema: latestBid.title || latestBid.tema,
+                                status: latestBid.status,
+                                clientName: latestBid.clientName,
+                                createdAt: latestBid.createdAt,
+                            });
+                            if (onNewBid) {
+                                onNewBid({
+                                    id: latestBid.id,
+                                    tema: latestBid.title || latestBid.tema,
+                                    status: latestBid.status,
+                                    clientName: latestBid.clientName,
+                                    createdAt: latestBid.createdAt,
+                                });
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Polling ошибка:', error);
+            }
+        };
+        
+        // Сразу проверяем, потом каждые 10 секунд
+        pollForNewBids();
+        pollingIntervalRef.current = setInterval(pollForNewBids, 10000);
     }, [onNewBid]);
 
-    useEffect(() => {
-        connect();
+    const stopPolling = useCallback(() => {
+        if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+        }
+    }, []);
 
-        // Очистка при размонтировании
+    useEffect(() => {
+        if (usePolling) {
+            startPolling();
+        } else {
+            connect();
+        }
+
         return () => {
             if (reconnectTimeoutRef.current) {
                 clearTimeout(reconnectTimeoutRef.current);
@@ -86,18 +162,20 @@ export function useWebSocket(onNewBid) {
             if (wsRef.current) {
                 wsRef.current.close();
             }
+            stopPolling();
         };
-    }, [connect]);
+    }, [connect, usePolling, startPolling, stopPolling]);
 
     const dismissBid = useCallback(() => {
         setLastBid(null);
     }, []);
 
     return {
-        isConnected,
+        isConnected: usePolling ? 'polling' : isConnected,
         lastBid,
         dismissBid,
         reconnect: connect,
+        usePolling,
     };
 }
 
