@@ -30,7 +30,6 @@ import Settings from './components/Settings';
 import Salary from './components/Salary';
 import Analytics from './components/Analytics';
 import Contracts from './components/Contracts';
-import BidNotification from './components/BidNotification';
 import { ErrorProvider } from './components/ErrorModal';
 // Импорт глобальных стилей
 import './index.css';
@@ -42,8 +41,6 @@ function App() {
             {/* Провайдер контекста аутентификации для всего приложения */}
             <AuthProvider>
                 <ErrorProvider>
-                    {/* Уведомления о новых заявках */}
-                    <BidNotification />
                     <Routes>
                         {/* Маршрут для страницы входа (доступен без аутентификации) */}
                         <Route path="/login" element={<Login />} />
