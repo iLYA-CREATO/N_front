@@ -542,7 +542,7 @@ const Bids = () => {
                     clientId: parseInt(formData.clientId),
                     title: formData.title,
                     description: formData.description,
-                    bidTypeId: parseInt(formData.bidTypeId),
+                    bidTypeId: formData.bidTypeId ? parseInt(formData.bidTypeId) : null,
                     workAddress: formData.workAddress,
                     contactFullName: formData.contactFullName,
                     contactPhone: formData.contactPhone,
@@ -554,6 +554,9 @@ const Bids = () => {
                     clientObjectIds: selectedClientObjects,
                 };
                 
+                console.log('Creating batch bids:', batchData);
+                await createBatchBids(batchData);
+                console.log('Batch bids created successfully');
                 
                 resetForm();
                 fetchBids();

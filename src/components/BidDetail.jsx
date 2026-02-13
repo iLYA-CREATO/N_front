@@ -1124,7 +1124,7 @@ const BidDetail = () => {
                 clientId: childBidFormData.clientId,
                 title: childBidFormData.title,
                 description: childBidFormData.description,
-                bidTypeId: childBidFormData.bidTypeId,
+                bidTypeId: childBidFormData.bidTypeId ? parseInt(childBidFormData.bidTypeId) : null,
                 amount: childBidFormData.amount,
                 workAddress: childBidFormData.workAddress,
                 contactFullName: childBidFormData.contactFullName,
