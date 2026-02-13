@@ -1,0 +1,30 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Urbanist:ital,wght@0,100..900;1,100..900&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+    font-family: 'Inter', 'sans-serif';
+}
+
+/* Table container styles */
+.table-container {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.table-container table {
+    flex: 1;
+    overflow: auto;
+    font-size: 0.875rem;
+}
+
+.table-container th,
+.table-container td {
+    padding: 0.5rem 0.75rem;
+}
+
+::-webkit-scrollbar {
+    width: 0;
+}
