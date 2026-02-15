@@ -8,7 +8,7 @@ import { useState, useEffect, useRef } from 'react';
 // Импорты из React Router для получения параметров URL и навигации
 import { useParams, useNavigate } from 'react-router-dom';
 // Импорты функций API для взаимодействия с сервером
-import { getBid, getBids, getClients, updateBid, getClientObjects, getComments, createComment, updateComment, deleteComment, getBidSpecifications, createBidSpecification, updateBidSpecification, deleteBidSpecification, getUsers, getSpecifications, getSpecificationCategories, getSpecificationCategoriesTree, getBidHistory, getBidStatuses, getBidStatusTransitions, getEquipment, getBidEquipment, createBidEquipment, updateBidEquipment, deleteBidEquipment, createBid, createBatchBids, getBidTypes, getClientEquipmentByClient, createClientEquipment, getRoles, getBidFiles, uploadBidFiles, deleteBidFile, getContractByBid, createContract, deleteContract } from '../services/api';
+import { getBid, getBids, getClients, updateBid, getClientObjects, getComments, createComment, updateComment, deleteComment, getBidSpecifications, createBidSpecification, updateBidSpecification, deleteBidSpecification, getUsers, getSpecifications, getSpecificationCategories, getSpecificationCategoriesTree, getBidHistory, getBidStatuses, getBidStatusTransitions, getEquipment, getBidEquipment, createBidEquipment, updateBidEquipment, deleteBidEquipment, createBid, createBatchBids, getBidTypes, getClientEquipmentByClient, createClientEquipment, getRoles, getBidFiles, uploadBidFiles, deleteBidFile, getContractByBid, createContract, deleteContract, validateBidFiles } from '../services/api';
 import { UPLOADS_URL } from '../services/config';
 // Импорт функций для уведомлений
 import { createNotification } from '../services/api';
@@ -498,49 +498,22 @@ const BidDetail = () => {
             }));
             setBidFiles(decodedFiles);
             
-            // Check which files actually exist on the server (silent check)
-            const missing = new Set();
-            
-            // Helper function to check file existence silently
-            const checkFileExists = (url, fileName) => {
-                return new Promise((resolve) => {
-                    // For images, use Image object
-                    if (url.match(/\.(jpg|jpeg|png|gif|webp|bmp)$/i)) {
-                        const img = new Image();
-                        img.onload = () => resolve(true);
-                        img.onerror = () => {
-                            console.info(`📁 Файл отсутствует: ${fileName}`);
-                            resolve(false);
-                        };
-                        img.src = url;
-                    } else {
-                        // For other files, use XMLHttpRequest
-                        const xhr = new XMLHttpRequest();
-                        xhr.open('HEAD', url, true);
-                        xhr.onload = () => resolve(xhr.status >= 200 && xhr.status < 400);
-                        xhr.onerror = () => {
-                            console.info(`📁 Файл отсутствует: ${fileName}`);
-                            resolve(false);
-                        };
-                        xhr.ontimeout = () => {
-                            console.info(`📁 Файл отсутствует (таймаут): ${fileName}`);
-                            resolve(false);
-                        };
-                        xhr.timeout = 5000;
-                        xhr.send();
-                    }
-                });
-            };
-            
-            // Check all files
-            for (const file of decodedFiles) {
-                const exists = await checkFileExists(file.path, file.originalName || file.name);
-                if (!exists) {
-                    missing.add(file.name);
-                }
+            // Validate files on server side - this will automatically clean up orphaned records
+            try {
+                await validateBidFiles(id);
+                // After validation, re-fetch files to get updated list (without orphaned records)
+                const validatedResponse = await getBidFiles(id);
+                const validatedDecodedFiles = validatedResponse.data.map(file => ({
+                    ...file,
+                    path: `${UPLOADS_URL}/bids/${id}/${decodeURIComponent(file.name)}`
+                }));
+                setBidFiles(validatedDecodedFiles);
+            } catch (validateError) {
+                // If validation fails, just use the files we have
+                console.log('File validation skipped:', validateError.message);
             }
             
-            setMissingFiles(missing);
+            setMissingFiles(new Set());
         } catch (error) {
             console.error('Error fetching bid files:', error);
         }
@@ -737,7 +710,7 @@ const BidDetail = () => {
                 const url = window.URL.createObjectURL(blob);
                 const link = document.createElement('a');
                 link.href = url;
-                link.download = file.originalName;
+                link.download = 'Вложение';
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
@@ -1657,22 +1630,21 @@ const BidDetail = () => {
                                                                             {isImage(file.originalName) ? (
                                                                                 <div>
                                                                                     <div className={`p-2 border-b ${isMissing ? 'bg-red-100 border-red-200' : 'bg-gray-50 border-gray-200'}`}>
-                                                                                        <p className="text-sm font-medium text-gray-700 truncate" title={file.originalName}>
-                                                                                            {file.originalName}
+                                                                                        <p className="text-sm font-medium text-gray-700">
+                                                                                            Вложение
                                                                                         </p>
                                                                                     </div>
                                                                                     {isMissing ? (
                                                                                         <div className="w-full h-32 bg-red-100 flex items-center justify-center">
                                                                                             <div className="text-center">
                                                                                                 <File size={32} className="text-red-400 mx-auto mb-1" />
-                                                                                                <p className="text-red-600 text-sm font-medium">{file.originalName}</p>
                                                                                                 <p className="text-red-500 text-xs">Файл не найден</p>
                                                                                             </div>
                                                                                         </div>
                                                                                     ) : (
                                                                                         <img 
                                                                                             src={file.path} 
-                                                                                            alt={file.originalName}
+                                                                                            alt="Вложение"
                                                                                             className="w-full h-20 object-contain bg-gray-100 cursor-pointer hover:opacity-90 transition-opacity"
                                                                                             onClick={() => openImageViewer(file)}
                                                                                         />
@@ -1708,8 +1680,8 @@ const BidDetail = () => {
                                                                                         <div className="flex items-center space-x-2">
                                                                                             <File size={24} className={isMissing ? 'text-red-400' : 'text-blue-500'} />
                                                                                             <div>
-                                                                                                <p className="font-medium text-gray-900 text-sm truncate" title={file.originalName}>
-                                                                                                    {file.originalName}
+                                                                                                <p className="font-medium text-gray-900 text-sm">
+                                                                                                    Вложение
                                                                                                 </p>
                                                                                                 <p className="text-xs text-gray-500">
                                                                                                     {file.size ? (file.size > 1024 * 1024 
@@ -2206,7 +2178,7 @@ const BidDetail = () => {
                     setFileToDelete(null);
                 }}
                 onConfirm={confirmDeleteFile}
-                fileName={bidFiles.find(f => f.name === fileToDelete)?.originalName || fileToDelete}
+                fileName="Вложение"
             />
 
             {/* Delete Equipment Confirmation Modal */}
@@ -2253,7 +2225,7 @@ const BidDetail = () => {
                     {/* Header with controls */}
                     <div className="absolute top-4 left-4 right-4 flex items-center justify-between text-white z-10">
                         <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">{currentImage.originalName}</span>
+                            <span className="text-sm font-medium">Вложение</span>
                         </div>
                         <div className="flex items-center gap-2">
                             <button
@@ -2300,7 +2272,7 @@ const BidDetail = () => {
                     >
                         <img
                             src={currentImage.path}
-                            alt={currentImage.originalName}
+                            alt="Вложение"
                             style={{
                                 transform: `rotate(${imageRotation}deg) scale(${imageZoom / 100}) translate(${imagePan.x}px, ${imagePan.y}px)`,
                                 maxWidth: '100%',

@@ -8,7 +8,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getBids, getBidTypes, getClients, getUsers, createBid, deleteBid } from '../services/api';
 import { usePermissions } from '../hooks/usePermissions';
-import { Search, Plus, X, ChevronLeft, ChevronRight, Settings, Trash2, Eye, Edit } from 'lucide-react';
+import { Search, Plus, X, ChevronLeft, ChevronRight, Settings, Trash2, Eye, ChevronUp, ChevronDown } from 'lucide-react';
 
 const Bids = () => {
     const navigate = useNavigate();
@@ -39,14 +39,12 @@ const Bids = () => {
     const [clients, setClients] = useState([]);
     const [users, setUsers] = useState([]);
 
-    // Состояние для видимых фильтров
-    const [visibleFilters, setVisibleFilters] = useState({
-        status: false,
-        type: false,
-        client: false,
-        responsible: false,
-        date: false
+    // Состояние для видимых фильтров (сохраняется в localStorage)
+    const [visibleFilters, setVisibleFilters] = useState(() => {
+        const saved = localStorage.getItem('bidsVisibleFilters');
+        return saved ? JSON.parse(saved) : { status: true, type: true, client: true, responsible: true, date: true };
     });
+    const [showFilterModal, setShowFilterModal] = useState(false);
 
     // Состояние для модального окна создания заявки
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -90,6 +88,55 @@ const Bids = () => {
     const [visibleColumns, setVisibleColumns] = useState(initialVisibleColumns);
     const [showColumnSettings, setShowColumnSettings] = useState(false);
 
+    // Состояние для сортировки
+    const [sortConfig, setSortConfig] = useState({
+        key: null,
+        direction: 'asc',
+    });
+
+    // Сохранение настроек в localStorage
+    useEffect(() => {
+        localStorage.setItem('bidsVisibleColumns', JSON.stringify(visibleColumns));
+    }, [visibleColumns]);
+
+    useEffect(() => {
+        localStorage.setItem('bidsColumnOrder', JSON.stringify(columnOrder));
+    }, [columnOrder]);
+
+    useEffect(() => {
+        localStorage.setItem('bidsVisibleFilters', JSON.stringify(visibleFilters));
+    }, [visibleFilters]);
+
+    // Закрытие выпадающих списков при клике вне
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (showColumnSettings && !event.target.closest('.column-settings')) {
+                setShowColumnSettings(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [showColumnSettings]);
+
+    // Загрузка справочников
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                const [typesRes, clientsRes, usersRes] = await Promise.all([
+                    getBidTypes(),
+                    getClients(),
+                    getUsers()
+                ]);
+                setBidTypes(typesRes.data || []);
+                setClients(clientsRes.data || []);
+                setUsers(usersRes.data || []);
+            } catch (err) {
+                console.error('Error fetching reference data:', err);
+            }
+        };
+        fetchData();
+    }, []);
+
     // Загрузка заявок
     const fetchBids = async () => {
         setLoading(true);
@@ -98,8 +145,8 @@ const Bids = () => {
             const params = {
                 page,
                 limit,
-                sortBy: 'createdAt',
-                sortOrder: 'desc'
+                sortBy: sortConfig.key || 'createdAt',
+                sortOrder: sortConfig.direction || 'desc'
             };
 
             if (searchQuery) params.search = searchQuery;
@@ -122,52 +169,13 @@ const Bids = () => {
         }
     };
 
-    // Загрузка справочников
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const [typesRes, clientsRes, usersRes] = await Promise.all([
-                    getBidTypes(),
-                    getClients(),
-                    getUsers()
-                ]);
-                setBidTypes(typesRes.data || []);
-                setClients(clientsRes.data || []);
-                setUsers(usersRes.data || []);
-            } catch (err) {
-                console.error('Error fetching reference data:', err);
-            }
-        };
-        fetchData();
-    }, []);
-
     // Загрузка заявок при изменении фильтров
     useEffect(() => {
         const timeout = setTimeout(() => {
             fetchBids();
         }, 300);
         return () => clearTimeout(timeout);
-    }, [page, searchQuery, statusFilter, typeFilter, clientFilter, responsibleFilter, dateFromFilter, dateToFilter]);
-
-    // Сохранение настроек колонок
-    useEffect(() => {
-        localStorage.setItem('bidsVisibleColumns', JSON.stringify(visibleColumns));
-    }, [visibleColumns]);
-
-    useEffect(() => {
-        localStorage.setItem('bidsColumnOrder', JSON.stringify(columnOrder));
-    }, [columnOrder]);
-
-    // Закрытие выпадающих списков при клике вне
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (showColumnSettings && !event.target.closest('.column-settings')) {
-                setShowColumnSettings(false);
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [showColumnSettings]);
+    }, [page, searchQuery, statusFilter, typeFilter, clientFilter, responsibleFilter, dateFromFilter, dateToFilter, sortConfig]);
 
     // Очистка фильтров
     const clearFilters = () => {
@@ -181,12 +189,70 @@ const Bids = () => {
         setPage(1);
     };
 
-    // Переключение видимости фильтра
-    const toggleFilter = (filterName) => {
-        setVisibleFilters(prev => ({
+    // Обработчик поиска
+    const handleSearch = (e) => {
+        e.preventDefault();
+        setPage(1);
+        fetchBids();
+    };
+
+    // Обработчик сортировки
+    const handleSort = (key) => {
+        let direction = 'asc';
+        if (sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
+
+    // Получение иконки сортировки
+    const getSortIcon = (column) => {
+        if (sortConfig.key !== column) {
+            return <div className="w-4 h-4 flex items-center justify-center opacity-30"><ChevronUp size={14} /><ChevronDown size={14} /></div>;
+        }
+        return sortConfig.direction === 'asc' ? <ChevronUp size={16} /> : <ChevronDown size={16} />;
+    };
+
+    // Перемещение колонки вверх
+    const moveUp = (index) => {
+        if (index > 0) {
+            const newOrder = [...columnOrder];
+            [newOrder[index], newOrder[index - 1]] = [newOrder[index - 1], newOrder[index]];
+            setColumnOrder(newOrder);
+        }
+    };
+
+    // Перемещение колонки вниз
+    const moveDown = (index) => {
+        if (index < columnOrder.length - 1) {
+            const newOrder = [...columnOrder];
+            [newOrder[index], newOrder[index + 1]] = [newOrder[index + 1], newOrder[index]];
+            setColumnOrder(newOrder);
+        }
+    };
+
+    // Переключение видимости колонки
+    const handleColumnToggle = (column) => {
+        setVisibleColumns(prev => ({
             ...prev,
-            [filterName]: !prev[filterName]
+            [column]: !prev[column]
         }));
+    };
+
+    // Получение метки колонки
+    const getColumnLabel = (column) => {
+        switch (column) {
+            case 'id': return 'ID';
+            case 'title': return 'Название';
+            case 'client': return 'Клиент';
+            case 'type': return 'Тип';
+            case 'status': return 'Статус';
+            case 'responsible': return 'Ответственный';
+            case 'createdAt': return 'Дата создания';
+            case 'plannedDate': return 'План. дата';
+            case 'amount': return 'Сумма';
+            default: return column;
+        }
     };
 
     // Создание заявки
@@ -272,6 +338,8 @@ const Bids = () => {
         return colors[status] || 'bg-gray-100 text-gray-800';
     };
 
+    const visibleColumnsList = columnOrder.filter(col => visibleColumns[col]);
+
     return (
         <div className="space-y-4">
             {/* Заголовок */}
@@ -285,205 +353,223 @@ const Bids = () => {
                         <Plus size={20} />
                         <span>Создать заявку</span>
                     </button>
-                    <div className="relative column-settings">
-                        <button
-                            onClick={() => setShowColumnSettings(!showColumnSettings)}
-                            className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
-                            title="Настройка колонок"
-                        >
-                            <Settings size={20} />
-                        </button>
-                        {showColumnSettings && (
-                            <div className="absolute right-0 top-12 w-64 bg-white border border-gray-300 rounded-lg shadow-lg z-10 p-4">
-                                <h3 className="font-medium mb-2">Колонки</h3>
-                                <div className="space-y-2">
-                                    {allColumns.map(column => (
-                                        <label key={column} className="flex items-center gap-2 cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={visibleColumns[column] || false}
-                                                onChange={(e) => setVisibleColumns(prev => ({
-                                                    ...prev,
-                                                    [column]: e.target.checked
-                                                }))}
-                                                className="rounded"
-                                            />
-                                            <span className="text-sm">
-                                                {column === 'id' && 'ID'}
-                                                {column === 'title' && 'Название'}
-                                                {column === 'client' && 'Клиент'}
-                                                {column === 'type' && 'Тип'}
-                                                {column === 'status' && 'Статус'}
-                                                {column === 'responsible' && 'Ответственный'}
-                                                {column === 'createdAt' && 'Дата создания'}
-                                                {column === 'plannedDate' && 'План. дата'}
-                                                {column === 'amount' && 'Сумма'}
-                                            </span>
-                                        </label>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
                 </div>
             </div>
 
-            {/* Поиск и фильтры */}
-            <div className="bg-white rounded-lg shadow p-4 space-y-4">
-                {/* Строка поиска */}
-                <div className="flex gap-2">
-                    <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                        <input
-                            type="text"
-                            placeholder="Поиск по названию или описанию..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        />
+            {/* Filter Modal */}
+            {showFilterModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg p-6 w-full max-w-md">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-lg font-medium">Видимость фильтров</h3>
+                            <button onClick={() => setShowFilterModal(false)}><X size={20} /></button>
+                        </div>
+                        <div className="space-y-3">
+                            {Object.keys(visibleFilters).map(filterKey => (
+                                <label key={filterKey} className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={visibleFilters[filterKey]}
+                                        onChange={() => setVisibleFilters(prev => ({
+                                            ...prev,
+                                            [filterKey]: !prev[filterKey]
+                                        }))}
+                                        className="rounded"
+                                    />
+                                    <span className="capitalize">
+                                        {filterKey === 'status' ? 'Статус' : 
+                                         filterKey === 'type' ? 'Тип' : 
+                                         filterKey === 'client' ? 'Клиент' : 
+                                         filterKey === 'responsible' ? 'Ответственный' : 
+                                         filterKey === 'date' ? 'Дата' : filterKey}
+                                    </span>
+                                </label>
+                            ))}
+                        </div>
                     </div>
-                    <button
-                        onClick={clearFilters}
-                        className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition"
-                    >
-                        Очистить
-                    </button>
                 </div>
+            )}
 
-                {/* Кнопки фильтров */}
-                <div className="flex flex-wrap gap-2">
-                    <button
-                        onClick={() => toggleFilter('status')}
-                        className={`px-3 py-1.5 rounded-lg text-sm transition ${
-                            visibleFilters.status ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
-                    >
-                        Статус {statusFilter && '✓'}
-                    </button>
-                    <button
-                        onClick={() => toggleFilter('type')}
-                        className={`px-3 py-1.5 rounded-lg text-sm transition ${
-                            visibleFilters.type ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
-                    >
-                        Тип {typeFilter && '✓'}
-                    </button>
-                    <button
-                        onClick={() => toggleFilter('client')}
-                        className={`px-3 py-1.5 rounded-lg text-sm transition ${
-                            visibleFilters.client ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
-                    >
-                        Клиент {clientFilter && '✓'}
-                    </button>
-                    <button
-                        onClick={() => toggleFilter('responsible')}
-                        className={`px-3 py-1.5 rounded-lg text-sm transition ${
-                            visibleFilters.responsible ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
-                    >
-                        Ответственный {responsibleFilter && '✓'}
-                    </button>
-                    <button
-                        onClick={() => toggleFilter('date')}
-                        className={`px-3 py-1.5 rounded-lg text-sm transition ${
-                            visibleFilters.date ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
-                    >
-                        Дата {(dateFromFilter || dateToFilter) && '✓'}
-                    </button>
-                </div>
-
-                {/* Панели фильтров */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {visibleFilters.status && (
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Статус</label>
-                            <select
-                                value={statusFilter}
-                                onChange={(e) => setStatusFilter(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            {/* Поиск и фильтры - серый фон как в Objects */}
+            <form onSubmit={handleSearch} className="bg-gray-200 rounded-lg p-4 mb-6 border border-gray-300 flex-none">
+                <div className="flex flex-col gap-4">
+                    {/* Кнопки настроек */}
+                    <div className="flex justify-end gap-2">
+                        {/* Column Settings Button */}
+                        <div className="relative">
+                            <button
+                                type="button"
+                                onClick={() => setShowColumnSettings(!showColumnSettings)}
+                                className="px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition"
                             >
-                                <option value="">Все статусы</option>
-                                {getAllStatuses().map(status => (
-                                    <option key={status} value={status}>{status}</option>
-                                ))}
-                            </select>
+                                Колонки
+                            </button>
+                            {showColumnSettings && (
+                                <div className="column-settings absolute right-0 top-full mt-2 w-64 bg-white border border-gray-300 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
+                                    <div className="p-3 border-b border-gray-200 flex justify-between items-center">
+                                        <h3 className="font-medium">Настройка колонок</h3>
+                                        <button type="button" onClick={() => setShowColumnSettings(false)}><X size={16} /></button>
+                                    </div>
+                                    <div className="p-2">
+                                        {columnOrder.map((column, index) => (
+                                            <div key={column} className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded">
+                                                <label className="flex items-center gap-2 flex-1 cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={visibleColumns[column]}
+                                                        onChange={() => handleColumnToggle(column)}
+                                                        className="rounded"
+                                                    />
+                                                    <span className="text-sm">{getColumnLabel(column)}</span>
+                                                </label>
+                                                <div className="flex flex-col">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => moveUp(index)}
+                                                        disabled={index === 0}
+                                                        className="text-gray-400 hover:text-gray-600 disabled:opacity-30"
+                                                    >
+                                                        <ChevronUp size={14} />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => moveDown(index)}
+                                                        disabled={index === columnOrder.length - 1}
+                                                        className="text-gray-400 hover:text-gray-600 disabled:opacity-30"
+                                                    >
+                                                        <ChevronDown size={14} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
-                    )}
-
-                    {visibleFilters.type && (
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Тип заявки</label>
-                            <select
-                                value={typeFilter}
-                                onChange={(e) => setTypeFilter(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                            >
-                                <option value="">Все типы</option>
-                                {bidTypes.map(type => (
-                                    <option key={type.id} value={type.id}>{type.name}</option>
-                                ))}
-                            </select>
+                        
+                        {/* Filter Settings Button */}
+                        <button
+                            type="button"
+                            onClick={() => setShowFilterModal(true)}
+                            className="px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition"
+                        >
+                            Фильтры
+                        </button>
+                    </div>
+                    
+                    {/* Поиск и фильтры */}
+                    <div className="flex flex-wrap gap-4 items-center">
+                        {/* Поиск */}
+                        <div className="flex-1 min-w-64">
+                            <input
+                                type="text"
+                                placeholder="Поиск по названию или описанию..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
                         </div>
-                    )}
-
-                    {visibleFilters.client && (
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Клиент</label>
-                            <select
-                                value={clientFilter}
-                                onChange={(e) => setClientFilter(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                            >
-                                <option value="">Все клиенты</option>
-                                {clients.map(client => (
-                                    <option key={client.id} value={client.id}>{client.name}</option>
-                                ))}
-                            </select>
-                        </div>
-                    )}
-
-                    {visibleFilters.responsible && (
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Ответственный</label>
-                            <select
-                                value={responsibleFilter}
-                                onChange={(e) => setResponsibleFilter(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                            >
-                                <option value="">Все</option>
-                                {users.map(user => (
-                                    <option key={user.id} value={user.id}>{user.fullName || user.username}</option>
-                                ))}
-                            </select>
-                        </div>
-                    )}
-
-                    {visibleFilters.date && (
-                        <>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Дата от</label>
+                    
+                        {/* Фильтры */}
+                        {visibleFilters.status && (
+                            <div className="w-48">
+                                <select
+                                    value={statusFilter}
+                                    onChange={(e) => setStatusFilter(e.target.value)}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                >
+                                    <option value="">Все статусы</option>
+                                    {getAllStatuses().map(status => (
+                                        <option key={status} value={status}>{status}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+                        
+                        {visibleFilters.type && (
+                            <div className="w-48">
+                                <select
+                                    value={typeFilter}
+                                    onChange={(e) => setTypeFilter(e.target.value)}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                >
+                                    <option value="">Все типы</option>
+                                    {bidTypes.map(type => (
+                                        <option key={type.id} value={type.id}>{type.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+                        
+                        {visibleFilters.client && (
+                            <div className="w-48">
+                                <select
+                                    value={clientFilter}
+                                    onChange={(e) => setClientFilter(e.target.value)}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                >
+                                    <option value="">Все клиенты</option>
+                                    {clients.map(client => (
+                                        <option key={client.id} value={client.id}>{client.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+                        
+                        {visibleFilters.responsible && (
+                            <div className="w-48">
+                                <select
+                                    value={responsibleFilter}
+                                    onChange={(e) => setResponsibleFilter(e.target.value)}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                >
+                                    <option value="">Все ответственные</option>
+                                    {users.map(user => (
+                                        <option key={user.id} value={user.id}>{user.fullName || user.username}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+                        
+                        {visibleFilters.date && (
+                            <div className="flex gap-2">
                                 <input
                                     type="date"
                                     value={dateFromFilter}
                                     onChange={(e) => setDateFromFilter(e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    placeholder="От"
                                 />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Дата до</label>
                                 <input
                                     type="date"
                                     value={dateToFilter}
                                     onChange={(e) => setDateToFilter(e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    placeholder="До"
                                 />
                             </div>
-                        </>
-                    )}
+                        )}
+                        
+                        <button
+                            type="submit"
+                            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
+                        >
+                            Применить
+                        </button>
+                        
+                        <button
+                            type="button"
+                            onClick={() => {
+                                clearFilters();
+                                fetchBids();
+                            }}
+                            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
+                        >
+                            Сброс
+                        </button>
+                    </div>
                 </div>
-            </div>
+            </form>
 
             {/* Таблица заявок */}
             <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -498,17 +584,16 @@ const Bids = () => {
                         <table className="w-full">
                             <thead className="bg-gray-50 border-b border-gray-200">
                                 <tr>
-                                    {columnOrder.filter(col => visibleColumns[col]).map(column => (
-                                        <th key={column} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                                            {column === 'id' && 'ID'}
-                                            {column === 'title' && 'Название'}
-                                            {column === 'client' && 'Клиент'}
-                                            {column === 'type' && 'Тип'}
-                                            {column === 'status' && 'Статус'}
-                                            {column === 'responsible' && 'Ответственный'}
-                                            {column === 'createdAt' && 'Дата создания'}
-                                            {column === 'plannedDate' && 'План. дата'}
-                                            {column === 'amount' && 'Сумма'}
+                                    {visibleColumnsList.map(column => (
+                                        <th 
+                                            key={column} 
+                                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                                            onClick={() => handleSort(column)}
+                                        >
+                                            <div className="flex items-center gap-1">
+                                                {getColumnLabel(column)}
+                                                {getSortIcon(column)}
+                                            </div>
                                         </th>
                                     ))}
                                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Действия</th>
@@ -521,7 +606,7 @@ const Bids = () => {
                                         className="hover:bg-gray-50 cursor-pointer"
                                         onClick={() => navigate(`/dashboard/bids/${bid.id}`)}
                                     >
-                                        {columnOrder.filter(col => visibleColumns[col]).map(column => (
+                                        {visibleColumnsList.map(column => (
                                             <td key={column} className="px-6 py-4 whitespace-nowrap">
                                                 {column === 'id' && (
                                                     <span className="text-sm font-medium text-gray-900">#{bid.id}</span>

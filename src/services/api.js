@@ -106,6 +106,10 @@ export const uploadBidFiles = async (bidId, files) => {
 };
 // Удаление файла заявки
 export const deleteBidFile = (bidId, fileName) => api.delete(`/bids/${bidId}/files/${encodeURIComponent(fileName)}`);
+// Валидация файлов заявки - удаляет записи о несуществующих файлах
+export const validateBidFiles = (bidId) => api.post(`/bids/${bidId}/files/validate`);
+// Глобальная валидация всех файлов всех заявок
+export const validateAllBidFiles = () => api.post('/bids/files/validate-all');
 
 // === ТИПЫ ЗАЯВОК ===
 // CRUD-операции для типов заявок
