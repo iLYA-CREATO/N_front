@@ -277,8 +277,8 @@ export const deleteNotification = (id) => api.delete(`/notifications/${id}`); //
 export const createNotification = (data) => api.post('/notifications/create', data); // Создание уведомления
 
 // === ДОГОВОРЫ ===
-export const getContracts = (page = 1, limit = 20, search = '') => {
-    return api.get('/contracts', { params: { page, limit, search } });
+export const getContracts = (params = {}) => {
+    return api.get('/contracts', { params });
 }; // Получение списка договоров
 
 export const getContractByBid = (bidId) => api.get(`/contracts/bid/${bidId}`); // Получение договора по ID заявки

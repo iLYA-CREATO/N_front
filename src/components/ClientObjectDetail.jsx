@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getClientObject, updateClientObject, deleteClientObject, getClients } from '../services/api';
+import { getClientObject, updateClientObject, deleteClientObject, getClients, getUsers } from '../services/api';
 import { usePermissions } from '../hooks/usePermissions';
 
 const ClientObjectDetail = () => {
@@ -16,8 +16,10 @@ const ClientObjectDetail = () => {
         brandModel: '',
         stateNumber: '',
         equipment: '',
+        responsibleId: '',
     });
     const [clients, setClients] = useState([]);
+    const [users, setUsers] = useState([]);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [showLinkedBidsModal, setShowLinkedBidsModal] = useState(false);
     const [notification, setNotification] = useState(null);
@@ -25,6 +27,7 @@ const ClientObjectDetail = () => {
     useEffect(() => {
         fetchClientObject();
         fetchClients();
+        fetchUsers();
     }, [id]);
 
     const fetchClientObject = async () => {
@@ -35,6 +38,7 @@ const ClientObjectDetail = () => {
                 brandModel: response.data.brandModel,
                 stateNumber: response.data.stateNumber,
                 equipment: response.data.equipment || '',
+                responsibleId: response.data.responsible?.id?.toString() || '',
             });
         } catch (error) {
             setError('Объект не найден');
@@ -50,6 +54,15 @@ const ClientObjectDetail = () => {
             setClients(response.data);
         } catch (error) {
             console.error('Error fetching clients:', error);
+        }
+    };
+
+    const fetchUsers = async () => {
+        try {
+            const response = await getUsers();
+            setUsers(response.data);
+        } catch (error) {
+            console.error('Error fetching users:', error);
         }
     };
 
@@ -72,6 +85,7 @@ const ClientObjectDetail = () => {
             brandModel: clientObject.brandModel,
             stateNumber: clientObject.stateNumber,
             equipment: clientObject.equipment || '',
+            responsibleId: clientObject.responsible?.id?.toString() || '',
         });
         setIsEditing(false);
     };
@@ -271,6 +285,31 @@ const ClientObjectDetail = () => {
                                 rows="3"
                                 placeholder="Необязательно"
                             />
+                        </div>
+                    )}
+                    {!isEditing && (
+                        <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Ответственный</label>
+                            <span className="text-gray-900">
+                                {clientObject.responsible ? clientObject.responsible.fullName : 'Не назначен'}
+                            </span>
+                        </div>
+                    )}
+                    {isEditing && (
+                        <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Ответственный</label>
+                            <select
+                                value={editForm.responsibleId}
+                                onChange={(e) => setEditForm({ ...editForm, responsibleId: e.target.value })}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                                <option value="">Не выбран</option>
+                                {users.map((user) => (
+                                    <option key={user.id} value={user.id}>
+                                        {user.fullName || user.username}
+                                    </option>
+                                ))}
+                            </select>
                         </div>
                     )}
                 </div>
